@@ -1,0 +1,43 @@
+openapi: "3.0.0"
+info:
+  title: Platform Demo API
+  version: "1.0"
+servers:
+  - url: http://host.docker.internal:8080
+paths:
+  /api/products:
+    get:
+      summary: List all products
+      responses:
+        "200":
+          description: OK
+  /api/products/search:
+    get:
+      summary: Search products (vulnerable)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/products/debug:
+    get:
+      summary: Debug info
+      responses:
+        "200":
+          description: OK
+  /api/products/redirect:
+    get:
+      summary: Redirect
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect
