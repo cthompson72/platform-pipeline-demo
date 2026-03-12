@@ -1,7 +1,8 @@
 """
 AI-Powered Code Review using Claude API.
 Reads the PR diff, sends it to Claude for contextual analysis,
-and posts findings as a PR comment.
+and posts findings as a PR comment. Enriched with Jira ticket
+context when an experience ID is available.
 """
 
 import os
@@ -48,20 +49,38 @@ def call_claude(diff):
     if len(diff) > max_diff_length:
         diff = diff[:max_diff_length] + "\n\n... [diff truncated for length]"
 
+    # Build context from Jira if available
+    jira_context = ""
+    ticket_id = os.environ.get("TICKET_ID", "")
+    ticket_summary = os.environ.get("TICKET_SUMMARY", "")
+    ticket_description = os.environ.get("TICKET_DESCRIPTION", "")
+    if ticket_id:
+        jira_context = f"""
+Jira Ticket Context:
+- Ticket: {ticket_id}
+- Summary: {ticket_summary}
+- Description: {ticket_description}
+Use this context to evaluate whether the code changes actually address what the ticket describes.
+If the code doesn't match the ticket intent, flag it as a CRITICAL finding.
+"""
+
     prompt = f"""You are a senior software engineer performing a code review on a pull request.
+{jira_context}
 Analyze the following diff and provide a review focusing on issues that static analysis tools 
 like Semgrep and SonarQube would NOT catch. Specifically look for:
 
-1. **Logic Errors**: Does the code actually do what the PR title/comments suggest?
-2. **Security Context**: Is sensitive data handled appropriately? Are there authorization gaps?
-3. **API Compatibility**: Would these changes break existing API consumers?
-4. **Error Handling**: Are edge cases covered? Are errors handled gracefully?
-5. **Race Conditions**: Any concurrency issues in shared state?
-6. **Business Logic**: Does the change make sense in the broader application context?
-7. **Documentation Drift**: Do comments still match what the code does?
+1. **Ticket Alignment**: Do the code changes actually address what the Jira ticket describes?
+2. **Logic Errors**: Does the code actually do what the PR title/comments suggest?
+3. **Security Context**: Is sensitive data handled appropriately? Are there authorization gaps?
+4. **API Compatibility**: Would these changes break existing API consumers?
+5. **Error Handling**: Are edge cases covered? Are errors handled gracefully?
+6. **Race Conditions**: Any concurrency issues in shared state?
+7. **Business Logic**: Does the change make sense in the broader application context?
+8. **Documentation Drift**: Do comments still match what the code does?
 
 Format your response as a structured review:
 - Start with a one-line summary of the overall change
+- If a Jira ticket is linked, assess whether the changes match the ticket intent
 - List findings with severity (CRITICAL / WARNING / SUGGESTION)
 - For each finding, explain WHY it matters, not just what you found
 - End with what the PR does WELL (positive feedback matters)
@@ -107,8 +126,15 @@ def post_pr_comment(review_text):
     pr_number = os.environ.get("PR_NUMBER")
     token = os.environ.get("GITHUB_TOKEN")
 
-    comment_body = f"""## 🤖 AI Code Review (Powered by Claude)
+    # Build Jira link if available
+    ticket_id = os.environ.get("TICKET_ID", "")
+    jira_base_url = os.environ.get("JIRA_BASE_URL", "")
+    jira_link = ""
+    if ticket_id and jira_base_url:
+        jira_link = f"\n🎫 **Experience ID**: [{ticket_id}]({jira_base_url}/browse/{ticket_id})\n"
 
+    comment_body = f"""## 🤖 AI Code Review (Powered by Claude)
+{jira_link}
 {review_text}
 
 ---
@@ -139,6 +165,13 @@ def main():
     print("Fetching PR diff...")
     diff = get_pr_diff()
     print(f"Diff size: {len(diff)} characters")
+
+    ticket_id = os.environ.get("TICKET_ID", "")
+    if ticket_id:
+        print(f"Experience ID: {ticket_id}")
+        print(f"Ticket Summary: {os.environ.get('TICKET_SUMMARY', 'N/A')}")
+    else:
+        print("No Experience ID found — reviewing without Jira context")
 
     print("Sending to Claude for review...")
     review = call_claude(diff)
