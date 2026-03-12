@@ -165,10 +165,26 @@ jobs:
           name: sbom
           path: sbom.json
 
+  # ── Stage 3c: Secret Detection — Gitleaks ──────────────────────────
+  secret-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --source=. --config=.gitleaks.toml --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # ── Stage 4: DAST — OWASP ZAP ─────────────────────────────────────
   dast-zap:
     runs-on: ubuntu-latest
-    needs: [sast-semgrep, dependency-scan, container-scan]
+    needs: [sast-semgrep, dependency-scan, container-scan, secret-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -211,7 +227,7 @@ jobs:
   # ── Stage 5: Quality Gate ──────────────────────────────────────────
   quality-gate:
     runs-on: ubuntu-latest
-    needs: [sast-semgrep, sast-sonarqube, dependency-scan, container-scan, dast-zap]
+    needs: [sast-semgrep, sast-sonarqube, dependency-scan, container-scan, dast-zap, secret-scan]
     if: always()
     steps:
       - name: Check all security stages
@@ -240,6 +256,7 @@ jobs:
           check_stage "Dependency Scan     " "${{ needs.dependency-scan.result }}"
           check_stage "Container Scan      " "${{ needs.container-scan.result }}"
           check_stage "OWASP ZAP DAST      " "${{ needs.dast-zap.result }}"
+          check_stage "Secret Detection    " "${{ needs.secret-scan.result }}"
           
           echo "╚══════════════════════════════════════════════════════╝"
           

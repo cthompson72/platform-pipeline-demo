@@ -1,0 +1,18 @@
+title = "Custom Gitleaks Config"
+
+# Extend the default rules
+[extend]
+useDefault = true
+
+# Custom rule for hardcoded credentials in Java
+[[rules]]
+id = "hardcoded-secret-variable"
+description = "Hardcoded secret in variable assignment"
+regex = '''(?i)(secret|password|api_key|token)\s*=\s*"[^"]{8,}"'''
+keywords = ["secret", "password", "api_key", "token"]
+
+[[rules]]
+id = "sk-live-key"
+description = "Live secret key pattern"
+regex = '''sk_live_[a-zA-Z0-9_]{10,}'''
+keywords = ["sk_live"]
