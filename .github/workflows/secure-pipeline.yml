@@ -199,6 +199,7 @@ jobs:
           format: openapi
           allow_issue_writing: false
           cmd_options: '-a'
+          docker_network: host
 
       - name: Upload ZAP report
         if: always()

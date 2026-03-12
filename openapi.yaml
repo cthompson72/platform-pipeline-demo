@@ -3,7 +3,7 @@ info:
   title: Platform Demo API
   version: "1.0"
 servers:
-  - url: http://host.docker.internal:8080
+  - url: http://localhost:8080
 paths:
   /api/products:
     get:
