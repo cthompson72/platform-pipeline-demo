@@ -51,8 +51,7 @@ public class ProductController {
     @SuppressWarnings("unchecked")
     @GetMapping("/search")
     public List<Product> searchUnsafe(@RequestParam String q) {
-        String sql = "SELECT * FROM product WHERE name LIKE '%" + q + "%'";
-        return entityManager.createNativeQuery(sql, Product.class).getResultList();
+        return productRepository.findByNameContainingIgnoreCase(q);
     }
 
     // ── VULNERABILITY 3: No input validation ─────────────────────────
