@@ -3,8 +3,6 @@ package com.example.platform_pipeline_demo.controller;
 
 import com.example.platform_pipeline_demo.model.Product;
 import com.example.platform_pipeline_demo.repository.ProductRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -19,9 +17,6 @@ public class ProductController {
 
     @Autowired
     private ProductRepository productRepository;
-
-    @PersistenceContext
-    private EntityManager entityManager;
 
     // ── VULNERABILITY 1: Hardcoded credential ────────────────────────
     // Semgrep + Gitleaks should flag this
@@ -49,10 +44,10 @@ public class ProductController {
     // Uses string concatenation in a native query — Semgrep and
     // SonarQube should both flag this as a critical finding
     @SuppressWarnings("unchecked")
+    // PPD-2: Fixed SQL injection by replacing raw query with parameterized repository method
     @GetMapping("/search")
-    public List<Product> searchUnsafe(@RequestParam String q) {
-        String sql = "SELECT * FROM product WHERE name LIKE '%" + q + "%'";
-        return entityManager.createNativeQuery(sql, Product.class).getResultList();
+    public List<Product> searchProducts(@RequestParam String q) {
+        return productRepository.findByNameContainingIgnoreCase(q);
     }
 
     // ── VULNERABILITY 3: No input validation ─────────────────────────
