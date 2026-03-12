@@ -338,3 +338,25 @@ jobs:
           STAGE_DAST_ZAP: ${{ needs.dast-zap.result }}
           STAGE_QUALITY_GATE: ${{ needs.quality-gate.result }}
         run: python scripts/jira_integration.py post-results
+
+  # ── Notify Slack ───────────────────────────────────────────────────
+  notify-slack:
+    runs-on: ubuntu-latest
+    needs: [extract-ticket, sast-semgrep, sast-sonarqube, dependency-scan, container-scan, secret-scan, dast-zap, quality-gate]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TICKET_ID: ${{ needs.extract-ticket.outputs.ticket_id }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          STAGE_SEMGREP: ${{ needs.sast-semgrep.result }}
+          STAGE_SONARCLOUD: ${{ needs.sast-sonarqube.result }}
+          STAGE_DEPENDENCY_SCAN: ${{ needs.dependency-scan.result }}
+          STAGE_CONTAINER_SCAN: ${{ needs.container-scan.result }}
+          STAGE_SECRET_SCAN: ${{ needs.secret-scan.result }}
+          STAGE_DAST_ZAP: ${{ needs.dast-zap.result }}
+          STAGE_QUALITY_GATE: ${{ needs.quality-gate.result }}
+        run: python scripts/slack_notify.py
