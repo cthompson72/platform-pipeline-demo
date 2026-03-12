@@ -68,6 +68,7 @@ jobs:
   sast-sonarqube:
     runs-on: ubuntu-latest
     needs: build-and-test
+    if: ${{ secrets.SONAR_HOST_URL != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
