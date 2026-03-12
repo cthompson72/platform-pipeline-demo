@@ -38,6 +38,26 @@ jobs:
             target/*.jar
             target/site/jacoco/
 
+  # ── Extract Experience ID from branch ──────────────────────────────
+  extract-ticket:
+    runs-on: ubuntu-latest
+    outputs:
+      ticket_id: ${{ steps.jira.outputs.ticket_id }}
+      ticket_summary: ${{ steps.jira.outputs.ticket_summary }}
+      ticket_status: ${{ steps.jira.outputs.ticket_status }}
+      ticket_url: ${{ steps.jira.outputs.ticket_url }}
+      ticket_description: ${{ steps.jira.outputs.ticket_description }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Jira ticket from branch
+        id: jira
+        env:
+          JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+        run: python scripts/jira_integration.py extract
+
   # ── Stage 2a: SAST — Semgrep ──────────────────────────────────────
   sast-semgrep:
     runs-on: ubuntu-latest
@@ -94,6 +114,33 @@ jobs:
             -Dsonar.projectKey=cthompson72_platform-pipeline-demo \
             -Dsonar.organization=cthompson72 \
             -Dsonar.host.url=https://sonarcloud.io
+
+  # ── Stage 2c: AI Code Review (PR only) ────────────────────────────
+  ai-code-review:
+    runs-on: ubuntu-latest
+    needs: [build-and-test, extract-ticket]
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run AI Code Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          TICKET_ID: ${{ needs.extract-ticket.outputs.ticket_id }}
+          TICKET_SUMMARY: ${{ needs.extract-ticket.outputs.ticket_summary }}
+          TICKET_DESCRIPTION: ${{ needs.extract-ticket.outputs.ticket_description }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+        run: python scripts/ai-review.py
 
   # ── Stage 3a: Dependency Scan — Trivy ──────────────────────────────
   dependency-scan:
@@ -268,3 +315,26 @@ jobs:
           
           echo ""
           echo "✅ Quality gate PASSED — cleared for deployment"
+
+  # ── Post Results to Jira ───────────────────────────────────────────
+  update-jira:
+    runs-on: ubuntu-latest
+    needs: [extract-ticket, sast-semgrep, sast-sonarqube, dependency-scan, container-scan, secret-scan, dast-zap, quality-gate]
+    if: always() && needs.extract-ticket.outputs.ticket_id != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Post pipeline results to Jira
+        env:
+          JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          TICKET_ID: ${{ needs.extract-ticket.outputs.ticket_id }}
+          STAGE_SEMGREP: ${{ needs.sast-semgrep.result }}
+          STAGE_SONARCLOUD: ${{ needs.sast-sonarqube.result }}
+          STAGE_DEPENDENCY_SCAN: ${{ needs.dependency-scan.result }}
+          STAGE_CONTAINER_SCAN: ${{ needs.container-scan.result }}
+          STAGE_SECRET_SCAN: ${{ needs.secret-scan.result }}
+          STAGE_DAST_ZAP: ${{ needs.dast-zap.result }}
+          STAGE_QUALITY_GATE: ${{ needs.quality-gate.result }}
+        run: python scripts/jira_integration.py post-results
