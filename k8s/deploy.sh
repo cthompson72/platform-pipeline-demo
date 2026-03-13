@@ -35,7 +35,7 @@ kubectl apply -f k8s/service.yaml -n "$NAMESPACE"
 
 # Wait for rollout
 echo "Waiting for rollout to complete..."
-kubectl rollout status deployment/platform-demo -n "$NAMESPACE" --timeout=120s
+kubectl rollout status deployment/platform-demo -n "$NAMESPACE" --timeout=300s
 
 # Get the service URL
 echo "Getting service endpoint..."
