@@ -125,10 +125,23 @@ def post_work_note(cr_number, sys_id, note_text):
 
 
 def do_extract():
-    """Extract change request number from branch and write to GitHub outputs."""
+    """Extract change request number from branch, commit message, or PR title."""
     branch = os.environ.get("GITHUB_HEAD_REF", os.environ.get("GITHUB_REF_NAME", ""))
     print(f"Branch: {branch}")
     ticket_id = extract_ticket_id(branch)
+
+    # If not found in branch (e.g., merge to main), check the commit message
+    if not ticket_id:
+        import subprocess
+        try:
+            commit_msg = subprocess.run(
+                ["git", "log", "-1", "--pretty=%s"],
+                capture_output=True, text=True
+            ).stdout.strip()
+            print(f"Commit message: {commit_msg}")
+            ticket_id = extract_ticket_id(commit_msg)
+        except Exception as e:
+            print(f"Could not read commit message: {e}")
 
     output_file = os.environ.get("GITHUB_OUTPUT")
 
