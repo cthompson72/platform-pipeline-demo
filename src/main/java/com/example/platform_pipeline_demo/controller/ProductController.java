@@ -54,6 +54,7 @@ public class ProductController {
     // Accepts any payload with no size limits, type checking, or
     // sanitization — SonarQube should flag missing validation
     // PPD-3: Added input validation for product creation
+// CHG0030003: Added input validation for product creation
     @PostMapping
     public Product createProduct(@RequestBody Product product) {
         if (product.getName() == null || product.getName().isBlank()) {
