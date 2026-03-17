@@ -45,21 +45,22 @@ jobs:
   extract-ticket:
     runs-on: ubuntu-latest
     outputs:
-      ticket_id: ${{ steps.jira.outputs.ticket_id }}
-      ticket_summary: ${{ steps.jira.outputs.ticket_summary }}
-      ticket_status: ${{ steps.jira.outputs.ticket_status }}
-      ticket_url: ${{ steps.jira.outputs.ticket_url }}
-      ticket_description: ${{ steps.jira.outputs.ticket_description }}
+      ticket_id: ${{ steps.snow.outputs.ticket_id }}
+      ticket_summary: ${{ steps.snow.outputs.ticket_summary }}
+      ticket_status: ${{ steps.snow.outputs.ticket_status }}
+      ticket_url: ${{ steps.snow.outputs.ticket_url }}
+      ticket_sys_id: ${{ steps.snow.outputs.ticket_sys_id }}
+      ticket_description: ${{ steps.snow.outputs.ticket_description }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract Jira ticket from branch
-        id: jira
+      - name: Extract ServiceNow CR from branch
+        id: snow
         env:
-          JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
-          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
-        run: python scripts/jira_integration.py extract
+          SERVICENOW_INSTANCE: ${{ vars.SERVICENOW_INSTANCE }}
+          SERVICENOW_USER: ${{ secrets.SERVICENOW_USER }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+        run: python scripts/servicenow_integration.py extract
 
   # ── Stage 2a: SAST — Semgrep ──────────────────────────────────────
   sast-semgrep:
@@ -142,7 +143,8 @@ jobs:
           TICKET_ID: ${{ needs.extract-ticket.outputs.ticket_id }}
           TICKET_SUMMARY: ${{ needs.extract-ticket.outputs.ticket_summary }}
           TICKET_DESCRIPTION: ${{ needs.extract-ticket.outputs.ticket_description }}
-          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          TICKET_URL: ${{ needs.extract-ticket.outputs.ticket_url }}
+          SERVICENOW_INSTANCE: ${{ vars.SERVICENOW_INSTANCE }}
         run: python scripts/ai-review.py
 
   # ── Stage 3a: Dependency Scan — Trivy ──────────────────────────────
@@ -289,7 +291,6 @@ jobs:
             "${{ needs.extract-ticket.outputs.ticket_id || 'none' }}" \
             "${{ github.sha }}"
           
-          # Capture staging IP for DAST
           for i in $(seq 1 30); do
             STAGING_IP=$(kubectl get svc platform-demo -n staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
             if [ -n "$STAGING_IP" ]; then
@@ -416,20 +417,21 @@ jobs:
             "${{ needs.extract-ticket.outputs.ticket_id || 'none' }}" \
             "${{ github.sha }}"
 
-  # ── Post Results to Jira ───────────────────────────────────────────
-  update-jira:
+  # ── Post Results to ServiceNow ─────────────────────────────────────
+  update-servicenow:
     runs-on: ubuntu-latest
     needs: [extract-ticket, sast-semgrep, sast-sonarqube, dependency-scan, container-build-scan, secret-scan, dast-staging, quality-gate, deploy-production]
     if: always() && needs.extract-ticket.outputs.ticket_id != ''
     steps:
       - uses: actions/checkout@v4
 
-      - name: Post pipeline results to Jira
+      - name: Post pipeline results to ServiceNow
         env:
-          JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
-          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          SERVICENOW_INSTANCE: ${{ vars.SERVICENOW_INSTANCE }}
+          SERVICENOW_USER: ${{ secrets.SERVICENOW_USER }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
           TICKET_ID: ${{ needs.extract-ticket.outputs.ticket_id }}
+          TICKET_SYS_ID: ${{ needs.extract-ticket.outputs.ticket_sys_id }}
           STAGE_SEMGREP: ${{ needs.sast-semgrep.result }}
           STAGE_SONARCLOUD: ${{ needs.sast-sonarqube.result }}
           STAGE_DEPENDENCY_SCAN: ${{ needs.dependency-scan.result }}
@@ -438,7 +440,7 @@ jobs:
           STAGE_DAST_STAGING: ${{ needs.dast-staging.result }}
           STAGE_QUALITY_GATE: ${{ needs.quality-gate.result }}
           STAGE_DEPLOY_PRODUCTION: ${{ needs.deploy-production.result }}
-        run: python scripts/jira_integration.py post-results
+        run: python scripts/servicenow_integration.py post-results
 
   # ── Notify Slack ───────────────────────────────────────────────────
   notify-slack:
@@ -452,7 +454,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           TICKET_ID: ${{ needs.extract-ticket.outputs.ticket_id }}
-          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          SERVICENOW_INSTANCE: ${{ vars.SERVICENOW_INSTANCE }}
           STAGE_SEMGREP: ${{ needs.sast-semgrep.result }}
           STAGE_SONARCLOUD: ${{ needs.sast-sonarqube.result }}
           STAGE_DEPENDENCY_SCAN: ${{ needs.dependency-scan.result }}

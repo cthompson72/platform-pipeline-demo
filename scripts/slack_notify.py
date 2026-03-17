@@ -67,8 +67,9 @@ def build_pipeline_message():
 
     # Experience ID and branch info
     context_parts = [f"*Branch:* `{branch}`"]
-    if ticket_id and jira_base:
-        context_parts.insert(0, f"*Experience ID:* <{jira_base}/browse/{ticket_id}|{ticket_id}>")
+    snow_instance = os.environ.get("SERVICENOW_INSTANCE", "")
+    if ticket_id and snow_instance:
+        context_parts.insert(0, f"*Experience ID:* {ticket_id} (ServiceNow)")
     if event == "pull_request":
         context_parts.append(f"*Trigger:* Pull Request")
     else:

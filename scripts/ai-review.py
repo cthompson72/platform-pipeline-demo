@@ -141,12 +141,16 @@ def post_pr_comment(review_text):
     token = os.environ.get("GITHUB_TOKEN")
 
     ticket_id = os.environ.get("TICKET_ID", "")
-    jira_base = os.environ.get("JIRA_BASE_URL", "")
-    jira_link = ""
-    if ticket_id and jira_base:
-        jira_link = f"\n**Experience ID**: [{ticket_id}]({jira_base}/browse/{ticket_id})\n"
+    snow_instance = os.environ.get("SERVICENOW_INSTANCE", "")
+    ticket_url = os.environ.get("TICKET_URL", "")
+    exp_link = ""
+    if ticket_id and ticket_url:
+        exp_link = f"\n**Experience ID**: [{ticket_id}]({ticket_url})\n"
+    elif ticket_id and snow_instance:
+        exp_link = f"\n**Experience ID**: {ticket_id} (ServiceNow)\n"
 
     comment_body = f"""## AI Code Review (Powered by Claude)
+    
 {jira_link}
 {review_text}
 
