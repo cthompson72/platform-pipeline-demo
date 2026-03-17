@@ -57,8 +57,18 @@ public class ProductController {
 // ── VULNERABILITY 3: No input validation ─────────────────────────
     // Accepts any payload with no size limits, type checking, or
     // sanitization — SonarQube should flag missing validation
+// CHG0030003: Added input validation for product creation
     @PostMapping
     public Product createProduct(@RequestBody Product product) {
+        if (product.getName() == null || product.getName().isBlank()) {
+            throw new IllegalArgumentException("Product name is required");
+        }
+        if (product.getBrand() == null || product.getBrand().isBlank()) {
+            throw new IllegalArgumentException("Product brand is required");
+        }
+        if (product.getPrice() < 0) {
+            throw new IllegalArgumentException("Product price cannot be negative");
+        }
         return productRepository.save(product);
     }
 
