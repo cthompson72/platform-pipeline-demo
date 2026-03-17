@@ -1,6 +1,6 @@
 """
 AI-Powered Code Review using Claude API.
-Enriched with Jira ticket context when an experience ID is available.
+Enriched with ServiceNow ticket context when an experience ID is available.
 """
 
 import os
@@ -67,26 +67,26 @@ def call_claude(diff):
         print("ANTHROPIC_API_KEY not set")
         sys.exit(1)
 
-    jira_context = ""
+    ticket_context = ""
     ticket_id = os.environ.get("TICKET_ID", "")
     ticket_summary = os.environ.get("TICKET_SUMMARY", "")
     ticket_description = os.environ.get("TICKET_DESCRIPTION", "")
     if ticket_id:
-        jira_context = f"""
-Jira Ticket Context:
-- Ticket: {ticket_id}
+        ticket_context = f"""
+ServiceNow Change Request Context:
+- Change Request: {ticket_id}
 - Summary: {ticket_summary}
 - Description: {ticket_description}
-Use this context to evaluate whether the code changes actually address what the ticket describes.
+Use this context to evaluate whether the code changes actually address what the change request describes.
 If the code doesn't match the ticket intent, flag it as a CRITICAL finding.
 """
 
     prompt = f"""You are a senior software engineer performing a code review on a pull request.
-{jira_context}
+{ticket_context}
 Analyze the following diff and provide a review focusing on issues that static analysis tools
 like Semgrep and SonarQube would NOT catch. Specifically look for:
 
-1. **Ticket Alignment**: Do the code changes actually address what the Jira ticket describes?
+1. **Ticket Alignment**: Do the code changes actually address what the change request describes?
 2. **Logic Errors**: Does the code actually do what the PR title/comments suggest?
 3. **Security Context**: Is sensitive data handled appropriately?
 4. **API Compatibility**: Would these changes break existing API consumers?
@@ -96,7 +96,7 @@ like Semgrep and SonarQube would NOT catch. Specifically look for:
 
 Format your response as a structured review:
 - Start with a one-line summary
-- If a Jira ticket is linked, assess whether the changes match the ticket intent
+- If a change request is linked, assess whether the changes match the ticket intent
 - List findings with severity (CRITICAL / WARNING / SUGGESTION)
 - For each finding, explain WHY it matters
 - End with what the PR does WELL
@@ -150,8 +150,7 @@ def post_pr_comment(review_text):
         exp_link = f"\n**Experience ID**: {ticket_id} (ServiceNow)\n"
 
     comment_body = f"""## AI Code Review (Powered by Claude)
-    
-{jira_link}
+{exp_link}
 {review_text}
 
 ---
@@ -184,7 +183,7 @@ def main():
     if ticket_id:
         print(f"Experience ID: {ticket_id}")
     else:
-        print("No Experience ID — reviewing without Jira context")
+        print("No Experience ID — reviewing without ServiceNow context")
 
     print("Sending to Claude for review...")
     review = call_claude(diff)
