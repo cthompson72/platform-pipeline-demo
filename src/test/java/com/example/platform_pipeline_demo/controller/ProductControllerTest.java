@@ -10,6 +10,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -31,7 +33,7 @@ class ProductControllerTest {
     void shouldReturnAllProducts() throws Exception {
         mockMvc.perform(get("/api/products"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(5))))
+                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(10))))
                 .andExpect(jsonPath("$[0].name").exists())
                 .andExpect(jsonPath("$[0].brand").exists());
     }
@@ -45,6 +47,12 @@ class ProductControllerTest {
     }
 
     @Test
+    void shouldReturn404ForMissingProduct() throws Exception {
+        mockMvc.perform(get("/api/products/9999"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void shouldSearchProductsSafely() throws Exception {
         mockMvc.perform(get("/api/products/search-safe")
                         .param("q", "Serum"))
@@ -54,8 +62,7 @@ class ProductControllerTest {
     }
 
     @Test
-    void shouldSearchProductsUnsafe() throws Exception {
-        // This works but uses the SQL-injectable endpoint
+    void shouldSearchProducts() throws Exception {
         mockMvc.perform(get("/api/products/search")
                         .param("q", "Mascara"))
                 .andExpect(status().isOk())
@@ -63,15 +70,46 @@ class ProductControllerTest {
     }
 
     @Test
+    void shouldSearchReturnEmptyList() throws Exception {
+        mockMvc.perform(get("/api/products/search")
+                        .param("q", "nonexistent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
     void shouldCreateProduct() throws Exception {
-        Product newProduct = new Product("Test Lipstick", "L'Oreal Paris", "makeup", 14.99);
+        Product newProduct = new Product("Test Lipstick", "L'Oreal Paris", "makeup", new BigDecimal("14.99"));
 
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(newProduct)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.name", is("Test Lipstick")));
+    }
+
+    @Test
+    void shouldRejectProductWithMissingName() throws Exception {
+        String body = """
+                {"brand":"Test","price":10.00,"category":"skincare"}
+                """;
+        mockMvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("Validation Failed")))
+                .andExpect(jsonPath("$.messages", hasSize(greaterThanOrEqualTo(1))));
+    }
+
+    @Test
+    void shouldReturnDetailedHealth() throws Exception {
+        mockMvc.perform(get("/api/products/health/detailed"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("UP")))
+                .andExpect(jsonPath("$.memory").exists())
+                .andExpect(jsonPath("$.uptime").exists())
+                .andExpect(jsonPath("$.productCount").exists());
     }
 
     @Test
@@ -81,13 +119,6 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.javaVersion").exists());
     }
 
-    /*
-    @Test
-    void shouldReturn404ForMissingProduct() throws Exception {
-        mockMvc.perform(get("/api/products/9999"))
-                .andExpect(status().is5xxServerError());
-    }
-    */
     @Test
     void shouldReturnHealthCheck() throws Exception {
         mockMvc.perform(get("/actuator/health"))
