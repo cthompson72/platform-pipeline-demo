@@ -38,7 +38,7 @@ jobs:
             EXP_ID="${{ github.event.inputs.experience_id }}"
           else
             BRANCH="${{ github.head_ref }}"
-            EXP_ID=$(echo "$BRANCH" | grep -oP 'PPD-[A-Za-z0-9]+' || echo "PPD-0")
+            EXP_ID=$(echo "$BRANCH" | grep -oP 'PPD-[A-Z0-9]+(-[A-Z0-9]+)*' || echo "PPD-0")
           fi
           echo "experience_id=$EXP_ID" >> $GITHUB_OUTPUT
           echo "Experience ID: $EXP_ID"
