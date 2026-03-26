@@ -13,6 +13,11 @@ on:
         required: true
         default: 'PPD-QA-001'
 
+  permissions:
+    contents: read
+    pull-requests: write
+    issues: write
+
 jobs:
   qa-pipeline:
     name: QA Pipeline
