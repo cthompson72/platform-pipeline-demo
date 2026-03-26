@@ -1,13 +1,18 @@
 package com.example.platform_pipeline_demo.controller;
 
-
 import com.example.platform_pipeline_demo.model.Product;
 import com.example.platform_pipeline_demo.repository.ProductRepository;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,9 +34,10 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public Product getProduct(@PathVariable Long id) {
+    public ResponseEntity<Product> getProduct(@PathVariable Long id) {
         return productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found: " + id));
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // ── Clean endpoint — safe parameterized query ────────────────────
@@ -40,36 +46,36 @@ public class ProductController {
         return productRepository.findByNameContainingIgnoreCase(q);
     }
 
-    // ── VULNERABILITY 2: SQL Injection ───────────────────────────────
-    // Uses string concatenation in a native query — Semgrep and
-    // SonarQube should both flag this as a critical finding
-    @SuppressWarnings("unchecked")
-    // PPD-2: Fixed SQL injection by replacing raw query with parameterized repository method
     @GetMapping("/search")
     public List<Product> searchProducts(@RequestParam String q) {
         return productRepository.findByNameContainingIgnoreCase(q);
     }
 
-    // ── VULNERABILITY 3: No input validation ─────────────────────────
-    // Accepts any payload with no size limits, type checking, or
-    // sanitization — SonarQube should flag missing validation
-    // PPD-3: Added input validation for product creation
-// ── VULNERABILITY 3: No input validation ─────────────────────────
-    // Accepts any payload with no size limits, type checking, or
-    // sanitization — SonarQube should flag missing validation
-// CHG0030003: Added input validation for product creation
     @PostMapping
-    public Product createProduct(@RequestBody Product product) {
-        if (product.getName() == null || product.getName().isBlank()) {
-            throw new IllegalArgumentException("Product name is required");
-        }
-        if (product.getBrand() == null || product.getBrand().isBlank()) {
-            throw new IllegalArgumentException("Product brand is required");
-        }
-        if (product.getPrice() < 0) {
-            throw new IllegalArgumentException("Product price cannot be negative");
-        }
+    @ResponseStatus(HttpStatus.CREATED)
+    public Product createProduct(@Valid @RequestBody Product product) {
         return productRepository.save(product);
+    }
+
+    // ── Detailed health check ────────────────────────────────────────
+    @GetMapping("/health/detailed")
+    public Map<String, Object> detailedHealth() {
+        Runtime runtime = Runtime.getRuntime();
+        long uptimeMillis = ManagementFactory.getRuntimeMXBean().getUptime();
+        Duration uptime = Duration.ofMillis(uptimeMillis);
+
+        Map<String, Object> health = new LinkedHashMap<>();
+        health.put("status", "UP");
+        health.put("database", "H2 (in-memory)");
+        health.put("productCount", productRepository.count());
+        health.put("memory", Map.of(
+                "free", runtime.freeMemory(),
+                "total", runtime.totalMemory(),
+                "max", runtime.maxMemory()
+        ));
+        health.put("uptime", String.format("%dd %dh %dm %ds",
+                uptime.toDays(), uptime.toHoursPart(), uptime.toMinutesPart(), uptime.toSecondsPart()));
+        return health;
     }
 
     // ── VULNERABILITY 4: Information disclosure ──────────────────────
