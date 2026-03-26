@@ -190,10 +190,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EXPERIENCE_ID: ${{ steps.exp_id.outputs.experience_id }}
         run: |
-          python3 -m ai-test-gen.main \
+          cd ai-test-gen && python3 main.py \
             --pr-number ${{ github.event.pull_request.number }} \
             --experience-id "$EXPERIENCE_ID" \
-            --repo ${{ github.repository }} 2>&1 | tee ai-gen-output.txt || true
+            --repo ${{ github.repository }} 2>&1 | tee ../ai-gen-output.txt || true
         continue-on-error: true
 
       - name: Run AI test generation (manual trigger)
@@ -204,7 +204,7 @@ jobs:
           EXPERIENCE_ID: ${{ steps.exp_id.outputs.experience_id }}
         run: |
           # For manual triggers, use the local test harness
-          python3 ai-test-gen/local_test.py 2>&1 | tee ai-gen-output.txt || true
+          cd ai-test-gen && python3 local_test.py 2>&1 | tee ../ai-gen-output.txt || true
         continue-on-error: true
 
       - name: Upload AI test gen results
